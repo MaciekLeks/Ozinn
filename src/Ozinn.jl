@@ -115,8 +115,10 @@ function tanh{T, N, D}(net::OziNet, inw::OziWire{T,N,D})
 end
 
 
-function sigmoid{T, N, D}(net::OziNet, inw::OziWire{T,N,D})
-  out = OziWire(T, N, D)
+function sigmoid{T, N, D}(net::OziNet, inw::OziWire{T,N,D}; out=nothing)
+  if out == nothing
+    out = OziWire(T, N, D)
+  end
   coating = OziCoating(out, inw)
   ident = one(T) #e.g 1.0
   coating.forward = () -> begin

@@ -10,14 +10,21 @@ initϵ = .9
   1.
   2.
   3.
+  4.
+  5.
+  6.
+  7.
+  8.
+  9.
+  10.
  ]
-label = [2. 3. 4.]
+label = [2. 3. 4. 5. 6. 7. 8. 9. 10. 11.]
 
 #{old code to be redefined
-maxiters = 5000
+maxiters = 110
 stepsize = 0.01
 clipval = 1. #wartość przycinania gradientu
-ϵ = 0.05 #error
+ϵ = 0.1 #error
 pull = 1.
 i = 0
 #old code to be redefined}
@@ -29,10 +36,10 @@ i = 0
   @show out = forward(model)
   score = out.vals
 
-  # if all(abs(label .- score) .<= ϵ)
-  #   println("final score = $score after $(iter) iters")
-  #   break
-  # end
+  if all(abs(label .- score) .<= ϵ)
+    println("final score = $score after $(iter) iters")
+    break
+  end
 
   fill!(out.grads, 0.)
   @show abs(label[j] .- score)
@@ -62,6 +69,18 @@ model.xin[:] = X[1,:]
 model.xin[:] = X[2,:]
 @show out = forward(model)
 model.xin[:] = X[3,:]
+@show out = forward(model)
+model.xin[:] = X[4,:]
+@show out = forward(model)
+model.xin[:] = X[5,:]
+@show out = forward(model)
+model.xin[:] = X[6,:]
+@show out = forward(model)
+model.xin[:] = X[7,:]
+@show out = forward(model)
+model.xin[:] = X[8,:]
+@show out = forward(model)
+model.xin[:] = X[9,:]
 @show out = forward(model)
 # model.xin[:] = X[4,:]
 # @show out = forward(model)
