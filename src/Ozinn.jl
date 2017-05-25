@@ -29,6 +29,7 @@ end
 
 
 #mini warstwa - tj. warstwa ale na poziomie pojedynczej operacji mul, add, tanh, sigmoid,...
+# micro layer at the level of simple operation, e.g. add, mull, tanh, sigmoid,...
 type OziCoating
   out::AbstractOziWire
   inw::Vector{AbstractOziWire}
