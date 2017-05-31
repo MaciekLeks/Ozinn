@@ -1,7 +1,7 @@
 module Ozinn
 
 export AbstractOziWire, AbstractOziLayer, AbstractOziModel, OziWire, OziNet
-export add, mul, sigmoid, relu, tanh, forward, backward, cleargrad, update
+export add, mul, sigmoid, relu, tanh, forward, backward, cleargrad, update, train!, predict
 
 abstract AbstractOziWire
 abstract AbstractOziLayer
@@ -28,7 +28,6 @@ function Base.eltype{T,N,D}(::OziWire{T,N,D})
 end
 
 
-#mini warstwa - tj. warstwa ale na poziomie pojedynczej operacji mul, add, tanh, sigmoid,...
 # micro layer at the level of simple operation, e.g. add, mull, tanh, sigmoid,...
 type OziCoating
   out::AbstractOziWire
@@ -228,6 +227,41 @@ function cleargrad(net::OziNet)
     #fill!(_net.cells[i].out.vals, zr)
     fill!(net.coatings[i].out.grads, zr)
   end
+end
+
+train!(net::OziNet, xin::AbstractArray, X::AbstractArray, label::AbstractArray; maxiters::Signed=10, stepsize::AbstractFloat=0.01, clipval::AbstractFloat=1., ϵ::AbstractFloat=0.1, pull::AbstractFloat=1.) = begin
+  i = 0
+  @time for iter=1:maxiters
+    i = i + 1
+    j = i % size(X,1) + 1
+    xin[:] = X[j,:]
+
+    out = forward(net)
+    score = out.vals
+
+    if all(abs(label .- score) .<= ϵ)
+      println("final score = $score after $(iter) iters")
+      break
+    end
+
+    fill!(out.grads, 0.)
+    #@show abs(label[j] .- score)
+    out.grads[(score .< label[j]) & (abs(label[j] .- score) .> ϵ)] = +pull #- rand(1)[1] #pull up
+    out.grads[(score .> label[j]) & (abs(label[j] .- score) .> ϵ)] = -pull #+ rand(1)[1] #pull down
+
+    backward(net)
+
+    update(net, stepsize, clipval)
+
+    println("out.grads=$(out.grads) score=$score label=$(label[j])")
+
+    cleargrad(net)
+  end
+end
+
+function predict(net::OziNet, xin::AbstractArray, testval::AbstractArray)
+  xin[:] = testval #ref
+  @show out = forward(net)
 end
 
 

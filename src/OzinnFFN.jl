@@ -2,7 +2,7 @@ module OzinnFFN #Feed Forward Network
 
 importall Ozinn
 
-export OziFFN, forward, backward, update, cleargrad
+export OziFFN, forward, backward, update, cleargrad, train!, predict
 
 type OziFFNLayer{T} <: AbstractOziLayer
   wxh::OziWire{T}
@@ -38,18 +38,29 @@ function OziFFN(T, insize, hdsizes::Vector{Int}, outsize, initϵ = 1.) #np. 3,4,
 
   return OziFFN{T}(_net, x.vals)
 end
+
 forward{T}(model::OziFFN{T}) = begin
   output = forward(model.net)
 end
+
 backward{T}(model::OziFFN{T}) = begin
   backward(model.net)
 end
+
 update{T}(model::OziFFN{T}, stepsize::T, clipval::T) = begin
   update(model.net, stepsize, clipval)
 end
+
 cleargrad{T}(model::OziFFN{T}) = begin
   cleargrad(model.net)
 end
 
+train!{T}(model::OziFFN{T}, X::AbstractArray, label::AbstractArray; maxiters::Signed=10, stepsize::AbstractFloat=0.01, clipval::AbstractFloat=1., ϵ::AbstractFloat=0.1, pull::AbstractFloat=1.) = begin
+  train!(model.net, model.xin, X, label, maxiters=maxiters, stepsize=stepsize, clipval=clipval, ϵ=ϵ, pull=pull)
+end
+
+predict{T}(model::OziFFN{T}, testval::AbstractArray) = begin
+  predict(model.net, model.xin, testval)
+end
 
 end #module

@@ -2,7 +2,7 @@ module OzinnRNN
 
 importall Ozinn
 
-export OziRNN, forward, backward, update, cleargrad
+export OziRNN, forward, backward, update, cleargrad, train!, predict
 
 type OziRNNLayer{T} <: AbstractOziLayer
   wxh::OziWire{T}
@@ -49,17 +49,29 @@ function OziRNN(T, insize, hdsizes::Vector{Int}, outsize, initϵ = 1.) #np. 3,4,
 
   return OziRNN{T}(_net, x.vals)
 end
+
 forward{T}(model::OziRNN{T}) = begin
   output = forward(model.net)
 end
+
 backward{T}(model::OziRNN{T}) = begin
   backward(model.net)
 end
+
 update{T}(model::OziRNN{T}, stepsize::T, clipval::T) = begin
   update(model.net, stepsize, clipval)
 end
+
 cleargrad{T}(model::OziRNN{T}) = begin
   cleargrad(model.net)
+end
+
+train!{T}(model::OziRNN{T}, X::AbstractArray, label::AbstractArray; maxiters::Signed=10, stepsize::AbstractFloat=0.01, clipval::AbstractFloat=1., ϵ::AbstractFloat=0.1, pull::AbstractFloat=1.) = begin
+  train!(model.net, model.xin, X, label, maxiters=maxiters, stepsize=stepsize, clipval=clipval, ϵ=ϵ, pull=pull)
+end
+
+predict{T}(model::OziRNN{T}, testval::AbstractArray) = begin
+  predict(model.net, model.xin, testval)
 end
 
 end #module
