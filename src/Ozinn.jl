@@ -29,28 +29,28 @@ end
 
 
 # micro layer at the level of simple operation, e.g. add, mull, tanh, sigmoid,...
-type OziCoating
+type OziGate
   out::AbstractOziWire
   inw::Vector{AbstractOziWire}
   forward::Function
   backward::Function
-  OziCoating(out::AbstractOziWire, inws::AbstractOziWire...) = new(out, [inws...])
+  OziGate(out::AbstractOziWire, inws::AbstractOziWire...) = new(out, [inws...])
 end
 
 #std recurrent nn
 
 #powinien być w środku modelu
 type OziNet
-  coatings::Vector{OziCoating}
-  # tagged::Vector{NnCoating} #layer decoders
-  OziNet() = new(Array(OziCoating,0))
+  gates::Vector{OziGate}
+  # tagged::Vector{NnGate} #layer decoders
+  OziNet() = new(Array(OziGate,0))
 end
 
 
 function add{T,N,D}(net::OziNet, inws::OziWire{T,N,D}...)
   out = OziWire(T, N, D)
-  coating = OziCoating(out, inws...)
-  coating.forward = () -> begin
+  gate = OziGate(out, inws...)
+  gate.forward = () -> begin
     fill!(out.vals, zero(T))
     @inbounds for inw in inws
       @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
@@ -59,7 +59,7 @@ function add{T,N,D}(net::OziNet, inws::OziWire{T,N,D}...)
     end
     return out
   end
-  coating.backward = () -> begin
+  gate.backward = () -> begin
         @inbounds for inw in inws
           @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
             inw.grads[i,j] += out.grads[i,j] #1.0 * dout
@@ -67,7 +67,7 @@ function add{T,N,D}(net::OziNet, inws::OziWire{T,N,D}...)
         #end
         end
   end
-  push!(net.coatings, coating)
+  push!(net.gates, gate)
   return out
 end
 
@@ -75,12 +75,12 @@ end
 function mul{T, N, D, M}(net::OziNet, inw1::OziWire{T,N,D}, inw2::OziWire{T,D,M})
   #@show N, D, M
   out = OziWire(T, N, M) # (N,D)*(D,M) > (N,M)
-  coating = OziCoating(out, inw1, inw2)
-  coating.forward = () -> begin
+  gate = OziGate(out, inw1, inw2)
+  gate.forward = () -> begin
     @inbounds out.vals = A_mul_B!(out.vals, inw1.vals, inw2.vals) #przeliczenie
     return out
   end
-  coating.backward = () ->
+  gate.backward = () ->
     begin
       @inbounds for i=1:N,j=1:M
         dout = out.grads[i,j]
@@ -90,27 +90,27 @@ function mul{T, N, D, M}(net::OziNet, inw1::OziWire{T,N,D}, inw2::OziWire{T,D,M}
         end
       end
     end
-  push!(net.coatings, coating)
+  push!(net.gates, gate)
   return out
 end
 
 function tanh{T, N, D}(net::OziNet, inw::OziWire{T,N,D})
   out = OziWire(T, N, D)
-  coating = OziCoating(out, inw)
-  coating.forward = () -> begin
+  gate = OziGate(out, inw)
+  gate.forward = () -> begin
       #@inbounds out.vals = A_mul_B!(out.vals, in1.vals, in2.vals) #przeliczenie
     @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
       out.vals[i,j] = Base.tanh(inw.vals[i,j])
     end
     return out
   end
-  coating.backward = () -> begin
+  gate.backward = () -> begin
       ident = one(T)
       @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
         inw.grads[i,j] = (ident - Base.tanh(inw.vals[i,j])^2) * out.grads[i,j]
       end
     end
-  push!(net.coatings, coating)
+  push!(net.gates, gate)
   return out
 end
 
@@ -119,20 +119,20 @@ function sigmoid{T, N, D}(net::OziNet, inw::OziWire{T,N,D}; out=nothing)
   if out == nothing
     out = OziWire(T, N, D)
   end
-  coating = OziCoating(out, inw)
+  gate = OziGate(out, inw)
   ident = one(T) #e.g 1.0
-  coating.forward = () -> begin
+  gate.forward = () -> begin
     @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
       out.vals[i,j] = ident / (ident + exp(-inw.vals[i,j]))
     end
     return out
   end
-  coating.backward = () -> begin
+  gate.backward = () -> begin
       @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
         inw.grads[i,j] = out.vals[i,j] * (ident - out.vals[i,j]) * out.grads[i,j]
       end
     end
-  push!(net.coatings, coating)
+  push!(net.gates, gate)
   return out
 end
 
@@ -144,23 +144,23 @@ function relu{T, N, D}(net::OziNet, inw::OziWire{T,N,D}; out=nothing)
   if out == nothing
     out = OziWire(T, N, D)
   end
-  coating = OziCoating(out, inw)
+  gate = OziGate(out, inw)
   ident1 = one(T) #e.g 1.0
   ident0 = zero(T) #e.g. 0.0
-  coating.forward = () -> begin
+  gate.forward = () -> begin
     @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
       out.vals[i,j] = max(inw.vals[i,j], ident0)
     end
     return out
   end
-  coating.backward = () -> begin
+  gate.backward = () -> begin
       @inbounds for j=1:D, i=1:N #todo: czy lepiej iść po kolei wiersze góra dół i potem następna kolumna, czy kolumny i dopiero wiersze
         inw.grads[i,j] = inw.vals[i,j] > ident0 ? ident1 * out.vals[i,j] : ident0
       end
     end
-  push!(net.coatings, coating)
+  push!(net.gates, gate)
   # if (tagged) #layer decoder
-  #   push!(net.tagged, coating)
+  #   push!(net.tagged, gate)
   # end
   return out
 end
@@ -168,8 +168,8 @@ end
 
 function forward(net::OziNet)
   res = nothing
-  @inbounds for i=1:length(net.coatings)
-    res = net.coatings[i].forward()
+  @inbounds for i=1:length(net.gates)
+    res = net.gates[i].forward()
     #println("forward $res")
   end
   return res
@@ -178,15 +178,15 @@ end
 
 
 function backward(net::OziNet)
-  @inbounds for i=length(net.coatings):-1:1
-    net.coatings[i].backward()
+  @inbounds for i=length(net.gates):-1:1
+    net.gates[i].backward()
   end
 end
 
 function update{T}(net::OziNet, stepsize::T, clipval::T)
-  #print("updateEx: coatings:$(length(net.coatings)):")
-  @inbounds for i=length(net.coatings):-1:1
-    inputs = net.coatings[i].inw
+  #print("updateEx: gates:$(length(net.gates)):")
+  @inbounds for i=length(net.gates):-1:1
+    inputs = net.gates[i].inw
     #print("inw[$i]: $(length(inputs)):")
     @inbounds for j=length(inputs):-1:1
       #print("inputs[$(j)]: $(inputs[j])")
@@ -208,24 +208,24 @@ end
 
 
 function cleargrad(net::OziNet)
-  len = length(net.coatings)
+  len = length(net.gates)
   if (len) < 1
     return
   end
 
-  tp = eltype(net.coatings[1].out.grads)
+  tp = eltype(net.gates[1].out.grads)
   zr = zero(tp)
 
   @inbounds for i=len:-1:1
     #fill!(_net.cells[i].in1.vals, zr)
-    inw = net.coatings[i].inw
+    inw = net.gates[i].inw
     @inbounds for k=1:length(inw)
       fill!(inw[k].grads, zr)
     end
     #fill!(_net.cells[i].in2.vals, zr)
     #fill!(_net.cells[i].in2.grads, zr)
     #fill!(_net.cells[i].out.vals, zr)
-    fill!(net.coatings[i].out.grads, zr)
+    fill!(net.gates[i].out.grads, zr)
   end
 end
 
